@@ -1,27 +1,44 @@
 import os
+import sys
 import requests
 import importlib.util
-from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
-# Set up your bot token
+# Set up your bot token (Replace with your actual token)
 TOKEN = "7933218460:AAFbOiu04bmACRQh43eh7VfazGesw01T0-Y"
 
-# Load the PornRips search plugin
+# Plugin paths
 PLUGIN_URL = "https://raw.githubusercontent.com/Larsluph/qbittorrent-search-plugins/prt/nova3/engines/pornrips.py"
 PLUGIN_PATH = "pornrips.py"
+HELPERS_URL = "https://raw.githubusercontent.com/qbittorrent/qBittorrent/master/src/searchengine/nova3/engines/helpers.py"
+HELPERS_PATH = "helpers.py"
 
-# Download the plugin if not already present
-if not os.path.exists(PLUGIN_PATH):
-    response = requests.get(PLUGIN_URL)
-    with open(PLUGIN_PATH, "w", encoding="utf-8") as f:
-        f.write(response.text)
+# Ensure required files are downloaded
+def download_file(url, path):
+    if not os.path.exists(path):
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(response.text)
+        else:
+            print(f"Failed to download {url}")
 
-# Load the plugin as a module
-spec = importlib.util.spec_from_file_location("pornrips", PLUGIN_PATH)
-pornrips = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(pornrips)
+download_file(PLUGIN_URL, PLUGIN_PATH)
+download_file(HELPERS_URL, HELPERS_PATH)
+
+# Adjust Python path for local module imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Load the helpers module
+spec_helpers = importlib.util.spec_from_file_location("helpers", HELPERS_PATH)
+helpers = importlib.util.module_from_spec(spec_helpers)
+spec_helpers.loader.exec_module(helpers)
+
+# Load the PornRips plugin
+spec_plugin = importlib.util.spec_from_file_location("pornrips", PLUGIN_PATH)
+pornrips = importlib.util.module_from_spec(spec_plugin)
+spec_plugin.loader.exec_module(pornrips)
 
 def search_torrent(update: Update, context: CallbackContext):
     query = " ".join(context.args)
@@ -30,7 +47,11 @@ def search_torrent(update: Update, context: CallbackContext):
         return
     
     # Call the search function from the plugin
-    results = pornrips.search(query)
+    try:
+        results = pornrips.search(query)
+    except Exception as e:
+        update.message.reply_text(f"Error fetching torrents: {str(e)}")
+        return
     
     if not results:
         update.message.reply_text("No torrents found")
