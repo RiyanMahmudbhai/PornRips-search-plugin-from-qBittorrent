@@ -36,14 +36,16 @@ helpers = importlib.util.module_from_spec(spec_helpers)
 spec_helpers.loader.exec_module(helpers)
 
 # Load the PornRips plugin
-import importlib
+import importlib.util
+import sys
+
+PLUGIN_PATH = "/root/PornRips-search-plugin-from-qBittorrent/pornrips.py"
 
 spec_plugin = importlib.util.spec_from_file_location("pornrips", PLUGIN_PATH)
 pornrips = importlib.util.module_from_spec(spec_plugin)
+sys.modules["pornrips"] = pornrips  # Register in sys.modules
 spec_plugin.loader.exec_module(pornrips)
 
-# Explicitly reload the module to ensure the search function is available
-importlib.reload(pornrips)
 
 def search_torrent(update: Update, context: CallbackContext):
     query = " ".join(context.args)
